@@ -1,0 +1,30 @@
+{
+    "data" : {
+              "images_dir_train" : "/home/abhishek/cityscapes/resized_images/train/",
+              "labels_dir_train" : "/home/abhishek/cityscapes/resized_labels/train/",
+              "images_dir_valid" : "/home/abhishek/cityscapes/resized_images/valid/",
+              "labels_dir_valid" : "/home/abhishek/cityscapes/resized_labels/valid/"
+             }, 
+    "model" : { 
+               "pretrained_weights" : "/home/abhishek/pretrained_models/resnet/resnet50_weights_tf_dim_ordering_tf_kernels_notop.h5",
+               "data_format" : "channels_first",
+               "num_classes" : 15
+              },
+    "training" : {
+                  "learning_rate" : 0.001,
+                  "num_epochs" : 100,
+                  "batch_size" : 8,
+                  "weight_decay" : 0.0001,
+                  "checkpoint_epoch" : 2
+                 },
+    "checkpoint" : { 
+                     "model_dir" : "model_",
+                     "model_file" : "psp",
+                     "model_metrics" : "metrics.npy"
+                   },
+    "inference" : {
+                   "data_dir" : "/home/abhishek/cityscapes/resized_images/",
+                   "which_checkpoint_model" : 100,
+                   "which_set" : "valid"
+                  }
+}
