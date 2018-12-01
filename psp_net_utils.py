@@ -29,6 +29,7 @@ def parse_fn(img_name, lbl_name):
     # decode
     img = tf.image.decode_png(img_string, channels=3)
     lbl = tf.image.decode_png(lbl_string, channels=0)
+    lbl = tf.squeeze(lbl)
 
     # datatype casting
     img = tf.cast(img, dtype=tf.float32)
@@ -41,7 +42,6 @@ def parse_fn(img_name, lbl_name):
 
     # CHW format
     img = tf.transpose(img, perm=[2, 0, 1])
-    lbl = tf.transpose(lbl, perm=[2, 0, 1])
 
     return img, lbl
 
