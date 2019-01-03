@@ -65,7 +65,7 @@ class PSPNet:
         # Stage 0
         self.stage0 = self._res_conv_layer(
             features, 'conv1', strides=self._encoder_pool_strides)
-        self.stage0 = self._res_batchnorm_layer(self.stage0, 'bn_conv1')
+        self.stage0 = self._get_batchnorm_layer(self.stage0, 'bn_conv1')
         self.stage0 = tf.nn.relu(self.stage0, name='relu1')
 
         # Stage 1
@@ -207,34 +207,22 @@ class PSPNet:
     # convolution layer     #
     #-----------------------#
     def _res_conv_layer(self, input_layer, name, strides=[1, 1, 1, 1]):
-        W = tf.constant(self._weights_h5[name][name + '_W_1:0'])
-        b = self._weights_h5[name][name + '_b_1:0']
-        b = tf.constant(np.reshape(b, (b.shape[0])))
-        x = tf.nn.conv2d(input_layer, filter=W, strides=strides,
-                         padding=self._padding, data_format=self._encoder_data_format, name=name)
-        x = tf.nn.bias_add(x, b, data_format=self._encoder_data_format)
+        W_init_value = np.array(
+            self._weights_h5[name][name + '_W_1:0'], dtype=np.float32)
+        b_init_value = np.array(
+            self._weights_h5[name][name + '_b_1:0'], dtype=np.float32)
+
+        W = tf.get_variable(name=name + 'kernel', shape=W_init_value.shape,
+                            initializer=tf.constant_initializer(W_init_value), dtype=tf.float32)
+        b = tf.get_variable(name=name + 'bias', shape=b_init_value.shape,
+                            initializer=tf.constant_initializer(b_init_value), dtype=tf.float32)
+
+        x = tf.nn.conv2d(input_layer, filter=W, strides=strides, padding=self._padding,
+                         data_format=self._encoder_data_format, name=name + '_conv')
+        x = tf.nn.bias_add(
+            x, b, data_format=self._encoder_data_format, name=name + '_bias')
 
         return x
-
-    #-----------------------#
-    # batchnorm layer       #
-    #-----------------------#
-    def _res_batchnorm_layer(self, input_layer, name):
-        if self._encoder_data_format == 'NCHW':
-            input_layer = tf.transpose(input_layer, perm=[0, 2, 3, 1])
-
-        mean = tf.constant(self._weights_h5[name][name + '_running_mean_1:0'])
-        std = tf.constant(self._weights_h5[name][name + '_running_std_1:0'])
-        beta = tf.constant(self._weights_h5[name][name + '_beta_1:0'])
-        gamma = tf.constant(self._weights_h5[name][name + '_gamma_1:0'])
-
-        bn = tf.nn.batch_normalization(
-            input_layer, mean=mean, variance=std, offset=beta, scale=gamma, variance_epsilon=1e-12, name=name)
-
-        if self._encoder_data_format == 'NCHW':
-            bn = tf.transpose(bn, perm=[0, 3, 1, 2])
-
-        return bn
 
     #-----------------------#
     # convolution block     #
@@ -242,19 +230,19 @@ class PSPNet:
     def _res_conv_block(self, input_layer, stage, strides):
         x = self._res_conv_layer(
             input_layer, name='res' + stage + '_branch2a', strides=strides)
-        x = self._res_batchnorm_layer(x, name='bn' + stage + '_branch2a')
+        x = self._get_batchnorm_layer(x, name='bn' + stage + '_branch2a')
         x = tf.nn.relu(x, name='relu' + stage + '_branch2a')
 
         x = self._res_conv_layer(x, name='res' + stage + '_branch2b')
-        x = self._res_batchnorm_layer(x, name='bn' + stage + '_branch2b')
+        x = self._get_batchnorm_layer(x, name='bn' + stage + '_branch2b')
         x = tf.nn.relu(x, name='relu' + stage + '_branch2b')
 
         x = self._res_conv_layer(x, name='res' + stage + '_branch2c')
-        x = self._res_batchnorm_layer(x, name='bn' + stage + '_branch2c')
+        x = self._get_batchnorm_layer(x, name='bn' + stage + '_branch2c')
 
         shortcut = self._res_conv_layer(
             input_layer, name='res' + stage + '_branch1', strides=strides)
-        shortcut = self._res_batchnorm_layer(
+        shortcut = self._get_batchnorm_layer(
             shortcut, name='bn' + stage + '_branch1')
 
         x = tf.add(x, shortcut, name='add' + stage)
@@ -267,15 +255,15 @@ class PSPNet:
     #-----------------------#
     def _res_identity_block(self, input_layer, stage):
         x = self._res_conv_layer(input_layer, name='res' + stage + '_branch2a')
-        x = self._res_batchnorm_layer(x, name='bn' + stage + '_branch2a')
+        x = self._get_batchnorm_layer(x, name='bn' + stage + '_branch2a')
         x = tf.nn.relu(x, name='relu' + stage + '_branch2a')
 
         x = self._res_conv_layer(x, name='res' + stage + '_branch2b')
-        x = self._res_batchnorm_layer(x, name='bn' + stage + '_branch2b')
+        x = self._get_batchnorm_layer(x, name='bn' + stage + '_branch2b')
         x = tf.nn.relu(x, name='relu' + stage + '_branch2b')
 
         x = self._res_conv_layer(x, name='res' + stage + '_branch2c')
-        x = self._res_batchnorm_layer(x, name='bn' + stage + '_branch2c')
+        x = self._get_batchnorm_layer(x, name='bn' + stage + '_branch2c')
 
         x = tf.add(x, input_layer, name='add' + stage)
         x = tf.nn.relu(x, name='relu' + stage)
