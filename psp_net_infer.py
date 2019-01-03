@@ -70,9 +70,9 @@ def infer(FLAGS):
         axis = 1
 
     # build model
-    training_pl = tf.placeholder(tf.bool)
+    is_training = tf.placeholder(tf.bool)
     net_arch = psp_net_model.PSPNet(
-        FLAGS.pretrained_weights, training_pl, FLAGS.data_format, FLAGS.num_classes)
+        FLAGS.pretrained_weights, is_training, FLAGS.data_format, FLAGS.num_classes)
     net_arch.resnet50_encoder(image_features_infer)
     net_arch.psp_net_decoder()
     network_logits = net_arch.logits
@@ -88,7 +88,7 @@ def infer(FLAGS):
     ss.run(tf.global_variables_initializer())
 
     # load the model parameters
-    print('Loading model parameters ....................')
+    print('Loading model parameters.....................')
     tf.train.Saver().restore(ss, os.path.join(os.getcwd(), model_dir,
                                               FLAGS.model_file + '-' + str(FLAGS.which_checkpoint_model)))
     print('Loading model parameters completed...........')
@@ -99,7 +99,7 @@ def infer(FLAGS):
     for img_file in list_images_infer:
         ti = time.time()
         labels_predicted = ss.run(
-            labels_prediction, feed_dict={training_pl: False})
+            labels_prediction, feed_dict={is_training: False})
         ti = time.time() - ti
         print('Time Taken for Inference : ' + str(ti))
         print('')
@@ -110,6 +110,7 @@ def infer(FLAGS):
                                  'label_' + img_file.split('/')[-1]), labels_predicted)
 
     print('Inference Completed')
+
     print('')
     ss.close()
 
