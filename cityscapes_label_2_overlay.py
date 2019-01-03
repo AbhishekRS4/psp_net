@@ -10,6 +10,7 @@ import tensorflow as tf
 from scipy.misc import imread
 
 tf.enable_eager_execution()
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 color_maps = np.array([[0, 0, 0],  # other
                        [128, 64, 128],  # road
@@ -68,16 +69,16 @@ def main():
     input_args = vars(parser.parse_args(sys.argv[1:]))
 
     print('Genrating overlays for images and masks')
+    print('')
     for k in input_args.keys():
         print(k + ': ' + str(input_args[k]))
     print('')
-    print('')
 
-    print('Overlay generation started....')
+    print('Overlay generation started...')
     overlay_generator(images_dir=input_args['images_dir'],
                       labels_dir=input_args['labels_dir'], overlays_dir=input_args['overlays_dir'])
     print('')
-    print('Overlay generation completed')
+    print('Overlay generation completed.')
 
 
 if __name__ == '__main__':
