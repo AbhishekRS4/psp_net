@@ -15,13 +15,16 @@ param_config_file_name = os.path.join(os.getcwd(), 'psp_net_config.json')
 
 # define metrics
 def compute_metrics(groundtruth, prediction, axis=1, num_classes=15):
-    prediction_labels = tf.argmax(
+    predicted_labels = tf.argmax(
         tf.nn.softmax(prediction, axis=axis), axis=axis)
+    groundtruth.set_shape([None, 512, 1024])
 
     with tf.name_scope('valid_metrics'):
-        acc_value, acc_op = tf.metrics.accuracy(groundtruth, prediction_labels)
+        acc_value, acc_op = tf.metrics.accuracy(groundtruth, predicted_labels)
+        iou_value, iou_op = tf.metrics.mean_iou(
+            groundtruth, predicted_labels, num_classes=num_classes)
 
-    return acc_value, acc_op
+    return acc_value, acc_op, iou_value, iou_op
 
 # define cross entropy loss
 def compute_loss(ground_truth, prediction, axis=1, name='mean_cross_entropy'):
@@ -34,18 +37,18 @@ def compute_loss(ground_truth, prediction, axis=1, name='mean_cross_entropy'):
     return mean_ce
 
 # return the optimizer which has to be used to minimize the loss function
-def get_optimizer(initial_learning_rate, loss_function, global_step, epsilon=0.0001):
+def get_optimizer(initial_learning_rate, loss_function, global_step, momentum=0.9):
     decay_steps = 300
     end_learning_rate = 0.000001
     decay_rate = 0.97
-    power = 0.95
+    power = 0.9
 
     learning_rate = tf.train.polynomial_decay(
         initial_learning_rate, global_step, decay_steps, end_learning_rate, power=power)
-    adam_optimizer_op = tf.train.AdamOptimizer(
-        learning_rate=learning_rate, epsilon=epsilon).minimize(loss_function)
+    optimizer_op = tf.train.MomentumOptimizer(
+        learning_rate=learning_rate, momentum=momentum).minimize(loss_function)
 
-    return adam_optimizer_op
+    return optimizer_op
 
 # save the trained model
 def save_model(session, model_directory, model_file, epoch):
@@ -61,7 +64,7 @@ def batch_train(FLAGS):
     print('Initializing completed...................')
     print('')
 
-    print('Preparing training meta data.......................')
+    print('Preparing training meta data.............')
     list_train = os.listdir(FLAGS.images_dir_train)
     list_valid = os.listdir(FLAGS.images_dir_valid)
 
@@ -90,7 +93,7 @@ def batch_train(FLAGS):
     num_batches_valid = int(
         math.ceil(num_samples_valid / float(FLAGS.batch_size)))
 
-    print('Preparing training meta data completed.............')
+    print('Preparing training meta data completed...')
     print('')
 
     print('Learning rate : ' + str(FLAGS.learning_rate))
@@ -102,7 +105,7 @@ def batch_train(FLAGS):
     print('Number of validation batches : ' + str(num_batches_valid))
     print('')
 
-    print('Building the model.....................')
+    print('Building the model.......................')
     axis = -1
     if FLAGS.data_format == 'channels_first':
         axis = 1
@@ -140,17 +143,17 @@ def batch_train(FLAGS):
         tf.add_n([tf.nn.l2_loss(v) for v in train_var_list])
     loss = loss_1 + loss_2
 
-    acc_value, acc_op = compute_metrics(
+    acc_value, acc_op, iou_value, iou_op = compute_metrics(
         labels, logits, axis=axis, num_classes=FLAGS.num_classes)
 
     global_step = tf.placeholder(tf.int32)
     optimizer_op = get_optimizer(FLAGS.learning_rate, loss, global_step)
     extra_update_op = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
 
-    print('Building the network completed...........')
+    print('Building the model completed.............')
     print('')
 
-    print('Training the network.....................')
+    print('Training the model.......................')
     os.environ['CUDA_VISIBLE_DEVICES'] = '0'
     ss = tf.Session(config=tf.ConfigProto(device_count={'GPU': 1}))
     ss.run(tf.global_variables_initializer())
@@ -159,12 +162,14 @@ def batch_train(FLAGS):
     train_loss_per_epoch = list()
     valid_loss_per_epoch = list()
     valid_acc_per_epoch = list()
+    valid_iou_per_epoch = list()
 
     for epoch in range(FLAGS.num_epochs):
         ti = time.time()
         temp_train_loss_per_epoch = 0
         temp_valid_loss_per_epoch = 0
         temp_valid_acc_per_epoch = 0
+        temp_valid_iou_per_epoch = 0
 
         ss.run(init_op_train)
         for batch_id in range(num_batches_train):
@@ -174,12 +179,13 @@ def batch_train(FLAGS):
 
         ss.run(init_op_valid)
         for batch_id in range(num_batches_valid):
-            loss_per_batch, _ = ss.run(
-                [loss_1, acc_op], feed_dict={is_training: False})
+            loss_per_batch, _, _ = ss.run(
+                [loss_1, acc_op, iou_op], feed_dict={is_training: False})
             temp_valid_loss_per_epoch += loss_per_batch
 
-        acc_valid = ss.run(acc_value)
+        acc_valid, iou_valid = ss.run([acc_value, iou_value])
         temp_valid_acc_per_epoch = acc_valid
+        temp_valid_iou_per_epoch = iou_valid
 
         stream_vars_valid = [
             v for v in tf.local_variables() if 'valid_metrics' in v.name]
@@ -189,17 +195,18 @@ def batch_train(FLAGS):
         train_loss_per_epoch.append(temp_train_loss_per_epoch)
         valid_loss_per_epoch.append(temp_valid_loss_per_epoch)
         valid_acc_per_epoch.append(temp_valid_acc_per_epoch)
+        valid_iou_per_epoch.append(temp_valid_iou_per_epoch)
 
         print(
             'Epoch : {0:d} / {1:d}, time taken : {2:.2f} sec.'.format(epoch + 1, FLAGS.num_epochs, ti))
-        print('training loss : {0:.4f}, validation loss : {1:.4f}, validation accuracy : {2:.4f}'.format(
-            temp_train_loss_per_epoch / num_batches_train, temp_valid_loss_per_epoch / num_batches_valid, temp_valid_acc_per_epoch))
+        print('training loss : {0:.4f}, validation loss : {1:.4f}, validation accuracy : {2:.4f}, validation mean iou : {3:.4f}'.format(
+            temp_train_loss_per_epoch / num_batches_train, temp_valid_loss_per_epoch / num_batches_valid, acc_valid, iou_valid))
         print('')
 
         if (epoch + 1) % FLAGS.checkpoint_epoch == 0:
             save_model(ss, model_dir, FLAGS.model_file, epoch)
 
-    print('Training the network completed...........')
+    print('Training the model completed.............')
     print('')
 
     print('Saving the model.........................')
@@ -207,6 +214,7 @@ def batch_train(FLAGS):
     train_loss_per_epoch = np.array(train_loss_per_epoch)
     valid_loss_per_epoch = np.array(valid_loss_per_epoch)
     valid_acc_per_epoch = np.array(valid_acc_per_epoch)
+    valid_iou_per_epoch = np.array(valid_iou_per_epoch)
 
     train_loss_per_epoch = np.true_divide(
         train_loss_per_epoch, num_batches_train)
@@ -217,6 +225,7 @@ def batch_train(FLAGS):
     losses_dict['train_loss'] = train_loss_per_epoch
     losses_dict['valid_loss'] = valid_loss_per_epoch
     losses_dict['valid_acc'] = valid_acc_per_epoch
+    losses_dict['valid_iou'] = valid_iou_per_epoch
 
     np.save(os.path.join(os.getcwd(), model_dir,
                          FLAGS.model_metrics), (losses_dict))
