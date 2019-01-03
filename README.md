@@ -7,16 +7,26 @@
 * 15 custom classes used
 
 ## Main idea
-* Apply pyramid pooling to feature maps of output stride 8 of input size and concatenate the output of pyramid pooling block to input 
-* Upsample using bilinear by a factor of 8
+* Apply pyramid pooling to feature maps of output stride 8 of input size and concatenate the output of pyramid pooling block to its input. Perform bilinear upsampling by a factor of 8
 
-## To do
-- [x] PSPNet
-- [ ] Compute metrics
-- [ ] Sample output
+## Intructions to run
+> To run training use - **python3 psp\_net\_train.py -h**
+>
+> To run inference use - **python3 psp\_net\_infer.py -h**
+>
+> This lists all possible commandline arguments
+
+## Visualization of results
+* [PSPNet](https://youtu.be/DPIeSIGCvBs)
 
 ## Reference
 * [ResNet-50](https://arxiv.org/abs/1512.03385)
 * [PSPNet](https://arxiv.org/pdf/1612.01105.pdf)
 * [PSPNet Project](https://hszhao.github.io/projects/pspnet/index.html)
 * [Cityscapes Dataset](https://www.cityscapes-dataset.com/)
+
+## To do
+- [x] PSPNet
+- [x] Visualize results
+- [ ] Compute metrics
+
