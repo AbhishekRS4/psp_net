@@ -16,8 +16,8 @@
 >
 > This lists all possible commandline arguments
 
-## Visualization of results
-* [PSPNet](https://youtu.be/DPIeSIGCvBs)
+## Visualization of results - Youtube video
+* [![IMAGE ALT TEXT](http://img.youtube.com/vi/DPIeSIGCvBs/0.jpg)](https://www.youtube.com/watch?v=DPIeSIGCvBs "Video Title")
 
 ## Reference
 * [ResNet-50](https://arxiv.org/abs/1512.03385)
